@@ -222,15 +222,18 @@ def demo_query(service: VoucherSyncService) -> None:
         logger.info("未查询到凭证记录")
         return
 
-    logger.info("查询到 %d 条凭证:", len(results))
+    logger.info("查询到 %d 条分录:", len(results))
     for r in results:
         logger.info(
-            "  ID=%-20s  日期=%-12s  凭证字=%s  号=%s  状态=%s  摘要=%s",
+            "  ID=%-10s  %s年%s期  号=%-6s  科目=%-12s %s  借=%-12.2f  贷=%-12.2f  摘要=%s",
             r.voucher_id,
-            r.date,
-            r.voucher_group,
+            r.year,
+            r.period,
             r.number,
-            r.document_status,
+            r.account_id,
+            r.account_name,
+            r.debit,
+            r.credit,
             r.explanation,
         )
 

@@ -265,7 +265,7 @@ class KingdeeClient:
         self,
         form_id: str,
         field_keys: str,
-        filter_string: str = "",
+        filter_string: Any = "",
         order_string: str = "",
         limit: int = 100,
         start_row: int = 0,
@@ -277,8 +277,11 @@ class KingdeeClient:
         Args:
             form_id:       表单 ID，凭证为 "GL_VOUCHER"
             field_keys:    逗号分隔的字段名，例如
-                           "FVoucherID,FDate,FVoucherGroupNo,FExplanation,FDocumentStatus"
-            filter_string: 过滤条件，例如 "FDate>='2024-01-01' and FDate<='2024-12-31'"
+                           "FVOUCHERID,FDate,FVOUCHERGROUPNO,FEXPLANATION,FDEBIT,FCREDIT"
+            filter_string: 过滤条件，支持两种格式：
+                           - str: SQL 风格，如 "FDate>='2024-01-01'"
+                           - list: 数组对象，如 [{"FieldName":"FYEAR","Compare":"76",
+                             "Value":"2026","Left":"","Right":"","Logic":"0"}]
             order_string:  排序字段，例如 "FDate desc"
             limit:         每页记录数（最大值视服务器配置而定）
             start_row:     起始行（用于分页）
@@ -296,6 +299,7 @@ class KingdeeClient:
             "TopRowCount": top_row_count,
             "StartRow": start_row,
             "Limit": limit,
+            "SubSystemId": "",
         }
         raw = self._post("query", payload)
         return self._parse_query_result(raw)

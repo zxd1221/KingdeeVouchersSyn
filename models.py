@@ -137,12 +137,17 @@ class Voucher:
 
 @dataclass
 class VoucherQueryResult:
-    """单据查询结果 — Voucher query result row."""
+    """单据查询结果 — Voucher query result row (one row = one entry line)."""
     voucher_id: str = ""
     date: str = ""
+    year: str = ""
+    period: str = ""
     number: str = ""
-    voucher_group: str = ""
     explanation: str = ""
+    debit: float = 0.0
+    credit: float = 0.0
+    account_id: str = ""
+    account_name: str = ""
     document_status: str = ""
     raw: dict = field(default_factory=dict)
 
@@ -151,9 +156,14 @@ class VoucherQueryResult:
         return cls(
             voucher_id=str(row.get("FVOUCHERID", "")),
             date=str(row.get("FDate", "")),
+            year=str(row.get("FYEAR", "")),
+            period=str(row.get("FPERIOD", "")),
             number=str(row.get("FVOUCHERGROUPNO", "")),
-            voucher_group=str(row.get("FVOUCHERGROUPID.FNumber", "")),
-            explanation="",  # explanation is in FEntity entries, not the header
+            explanation=str(row.get("FEXPLANATION", "")),
+            debit=float(row.get("FDEBIT") or 0),
+            credit=float(row.get("FCREDIT") or 0),
+            account_id=str(row.get("FACCOUNTID", "")),
+            account_name=str(row.get("FACCOUNTNAME", "")),
             document_status=str(row.get("FDocumentStatus", "")),
             raw=row,
         )

@@ -8,7 +8,7 @@ Supports batch creation and querying of GL_VOUCHER entries.
 
 import logging
 from datetime import date
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import config
 from kingdee_client import KingdeeClient, KingdeeAPIError
@@ -17,18 +17,29 @@ from models import Voucher, VoucherQueryResult
 logger = logging.getLogger(__name__)
 
 # Default fields returned by query_vouchers.
-# NOTE: FExplanation (摘要) lives on FEntity entries, NOT on the GL_VOUCHER header.
-#       Requesting it here would return an empty column or cause a server error.
+# These are confirmed working in the official WebAPI tester.
+# Includes entry-level fields (FEXPLANATION, FDEBIT, FCREDIT, FACCOUNTID, FACCOUNTNAME),
+# so each result row represents one voucher entry line, not the header.
 DEFAULT_QUERY_FIELDS = (
     "FVOUCHERID"
-    ",FDate"
-    ",FBillNo"
-    ",FVOUCHERGROUPID.FNumber"
+    ",FYEAR"
+    ",FPERIOD"
     ",FVOUCHERGROUPNO"
-    ",FDocumentStatus"
-    ",FCreatorId.FName"
-    ",FCreateDate"
+    ",FEXPLANATION"
+    ",FDEBIT"
+    ",FCREDIT"
+    ",FACCOUNTID"
+    ",FACCOUNTNAME"
+    ",FDate"
 )
+
+# Compare codes for FilterString array format (confirmed from WebAPI tester):
+#   "76" = equals (=)
+#   "4"  = greater than or equal (>=)
+#   "6"  = less than or equal (<=)
+_CMP_EQ = "76"
+_CMP_GTE = "4"
+_CMP_LTE = "6"
 
 
 class VoucherSyncService:
@@ -127,18 +138,22 @@ class VoucherSyncService:
         document_status: Optional[str] = None,
         voucher_group: Optional[str] = None,
         field_keys: str = DEFAULT_QUERY_FIELDS,
-        order_string: str = "FDate desc,FVoucherGroupNo desc",
+        order_string: str = "FVOUCHERID",
         limit: int = 100,
         start_row: int = 0,
     ) -> List[VoucherQueryResult]:
         """
         单据查询 — Query existing vouchers from Kingdee.
 
+        FilterString is sent as an array of filter objects (confirmed working format).
+        Each object: {"FieldName":…, "Compare":…, "Value":…, "Left":"", "Right":"", "Logic":"0"}
+        Compare codes: "76"=equals, "4"=>=, "6"=<=
+
         Args:
             date_from:       开始日期（含）
             date_to:         结束日期（含）
-            document_status: 单据状态过滤，例如 "A"（暂存）、"C"（已审核）
-            voucher_group:   凭证字过滤，例如 "记"
+            document_status: 单据状态过滤，例如 "Z"（暂存）、"C"（已审核）
+            voucher_group:   凭证字编码过滤，例如 "PRE001"
             field_keys:      返回字段列表（逗号分隔）
             order_string:    排序字段
             limit:           返回条数限制
@@ -147,25 +162,40 @@ class VoucherSyncService:
         Returns:
             VoucherQueryResult 列表
         """
-        filters: List[str] = []
+        filters: List[Dict[str, str]] = []
 
         if date_from:
-            # Use full datetime in filter: stored value is "YYYY-MM-DD 00:00:00",
-            # so comparing against bare "YYYY-MM-DD" fails as a string (because
-            # "2026-02-27 00:00:00" > "2026-02-27" lexicographically).
-            filters.append(f"FDate>='{date_from.strftime('%Y-%m-%d')} 00:00:00'")
+            filters.append({
+                "FieldName": "FDate",
+                "Compare": _CMP_GTE,
+                "Value": date_from.strftime('%Y-%m-%d') + " 00:00:00",
+                "Left": "", "Right": "", "Logic": "0",
+            })
         if date_to:
-            filters.append(f"FDate<='{date_to.strftime('%Y-%m-%d')} 23:59:59'")
+            filters.append({
+                "FieldName": "FDate",
+                "Compare": _CMP_LTE,
+                "Value": date_to.strftime('%Y-%m-%d') + " 23:59:59",
+                "Left": "", "Right": "", "Logic": "0",
+            })
         if document_status:
-            filters.append(f"FDocumentStatus='{document_status}'")
+            filters.append({
+                "FieldName": "FDocumentStatus",
+                "Compare": _CMP_EQ,
+                "Value": document_status,
+                "Left": "", "Right": "", "Logic": "0",
+            })
         if voucher_group:
-            filters.append(f"FVOUCHERGROUPID.FNumber='{voucher_group}'")
-
-        filter_string = " and ".join(filters)
+            filters.append({
+                "FieldName": "FVOUCHERGROUPID.FNumber",
+                "Compare": _CMP_EQ,
+                "Value": voucher_group,
+                "Left": "", "Right": "", "Logic": "0",
+            })
 
         logger.info(
-            "Querying GL_VOUCHER | filter=%r | limit=%d | start=%d",
-            filter_string,
+            "Querying GL_VOUCHER | filters=%r | limit=%d | start=%d",
+            filters,
             limit,
             start_row,
         )
@@ -173,7 +203,7 @@ class VoucherSyncService:
         rows = self.client.query(
             form_id=config.VOUCHER_FORM_ID,
             field_keys=field_keys,
-            filter_string=filter_string,
+            filter_string=filters,
             order_string=order_string,
             limit=limit,
             start_row=start_row,
@@ -186,7 +216,7 @@ class VoucherSyncService:
     def query_vouchers_raw(
         self,
         field_keys: str = DEFAULT_QUERY_FIELDS,
-        filter_string: str = "",
+        filter_string: Union[str, List[Dict[str, Any]]] = "",
         order_string: str = "FDate desc",
         limit: int = 100,
         start_row: int = 0,
