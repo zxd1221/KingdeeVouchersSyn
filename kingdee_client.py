@@ -292,22 +292,21 @@ class KingdeeClient:
             记录列表，每条记录为 {字段名: 值} 的字典
         """
         self._ensure_logged_in()
-        # ExecuteBillQuery expects {"formid":..., "data":{query params}}
-        # (same envelope pattern as Save / BatchSave)
-        payload = {
-            "formid": form_id,
-            "data": {
-                "FormId": form_id,
-                "FieldKeys": field_keys,
-                "FilterString": filter_string,
-                "OrderString": order_string,
-                "TopRowCount": top_row_count,
-                "StartRow": start_row,
-                "Limit": limit,
-                "SubSystemId": "",
-            },
+        # ExecuteBillQuery requires data to be a JSON-encoded *string*,
+        # matching the SDK signature: client.ExecuteBillQuery("{...json...}")
+        # The WebAPI tester also stringifies the user input before posting.
+        query_params = {
+            "FormId": form_id,
+            "FieldKeys": field_keys,
+            "FilterString": filter_string,
+            "OrderString": order_string,
+            "TopRowCount": top_row_count,
+            "StartRow": start_row,
+            "Limit": limit,
+            "SubSystemId": "",
         }
-        logger.debug("Query payload: %s", payload)
+        payload = {"data": json.dumps(query_params, ensure_ascii=False)}
+        logger.debug("Query payload data string: %s", payload["data"])
         raw = self._post("query", payload)
         return self._parse_query_result(raw)
 
