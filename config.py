@@ -18,7 +18,7 @@ BASE_URL: str = os.getenv("KINGDEE_BASE_URL", "https://gljwl.ik3cloud.com")
 ACCT_ID: str = os.getenv("KINGDEE_ACCT_ID", "20210324173947733")
 USERNAME: str = os.getenv("KINGDEE_USERNAME", "admin")
 # 密钥 / API 密码
-PASSWORD: str = os.getenv("KINGDEE_PASSWORD", "ca058a5dfe9b4d90813b9590bc646590")
+PASSWORD: str = os.getenv("KINGDEE_PASSWORD", "dell@123")
 APP_ID: str = os.getenv("KINGDEE_APP_ID", "454962_WdbB3dhuTpH/7YUFRYxo3YzM0MX90BMo")
 # 语言 ID: 2052 = 简体中文
 LCID: int = int(os.getenv("KINGDEE_LCID", "2052"))

@@ -129,6 +129,52 @@ class KingdeeClient:
         if not self._logged_in:
             self.login()
 
+    # ── 单条保存 Save ──────────────────────────────────────────────────────────
+
+    def save(
+        self,
+        form_id: str,
+        data: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """
+        单条保存单据 — Save a single bill.
+
+        Args:
+            form_id: 表单 ID，凭证为 "GL_VOUCHER"
+            data:    单张凭证的字段字典
+
+        Returns:
+            原始 API 响应字典，包含 Result.ResponseStatus
+        """
+        self._ensure_logged_in()
+        payload = {
+            "formid": form_id,
+            "data": data,
+        }
+        result = self._post("save", payload)
+        self._check_save_result(result)
+        return result
+
+    @staticmethod
+    def _check_save_result(result: Any) -> None:
+        """Log success/failure details from a Save response."""
+        try:
+            resp_status = result["Result"]["ResponseStatus"]
+        except (KeyError, TypeError):
+            logger.warning("Unexpected Save response structure: %s", result)
+            return
+
+        if resp_status.get("IsSuccess"):
+            successes = resp_status.get("SuccessEntitys", [])
+            for s in successes:
+                logger.info("Save succeeded: ID=%s  Number=%s", s.get("Id"), s.get("Number"))
+        else:
+            errors = resp_status.get("Errors", [])
+            err_msgs = "; ".join(
+                e.get("Message", str(e)) for e in errors
+            )
+            raise KingdeeAPIError(f"Save failed: {err_msgs}")
+
     # ── 批量保存 BatchSave ─────────────────────────────────────────────────────
 
     def batch_save(

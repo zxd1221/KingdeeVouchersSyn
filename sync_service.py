@@ -41,6 +41,32 @@ class VoucherSyncService:
     def __init__(self, client: Optional[KingdeeClient] = None) -> None:
         self.client = client or KingdeeClient.from_config()
 
+    # ── 单条保存凭证 ────────────────────────────────────────────────────────────
+
+    def save_voucher(
+        self,
+        voucher: Voucher,
+        validate: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        单条保存凭证 — Save a single voucher to Kingdee.
+
+        Args:
+            voucher:  Voucher 对象
+            validate: 是否在提交前校验借贷平衡（默认开启）
+
+        Returns:
+            原始 API 响应
+        """
+        if validate:
+            voucher.validate()
+
+        self.client._ensure_logged_in()
+        data = voucher.to_kingdee_data()
+        logger.info("Saving single voucher (date=%s, group=%s)...", voucher.date, voucher.voucher_group)
+        result = self.client.save(config.VOUCHER_FORM_ID, data)
+        return result
+
     # ── 批量保存凭证 ────────────────────────────────────────────────────────────
 
     def batch_save_vouchers(

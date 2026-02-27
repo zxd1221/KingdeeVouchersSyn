@@ -23,20 +23,64 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# 今天的日期 — today's date
+TODAY = date.today()
+
 
 # ── Sample data builder ────────────────────────────────────────────────────────
 
-def build_sample_vouchers() -> list[Voucher]:
+def build_single_voucher() -> Voucher:
     """
-    构造示例凭证数据（替换为实际的已计算数据）。
-    Build sample voucher data — replace with your actual computed data.
+    构造单条测试凭证（使用今天日期）。
+    Build a single test voucher using today's date.
+
+    必填字段 / Required fields:
+      Header : FDate, FVoucherGroupID, FDocumentStatus, FPrepareID
+      Entry  : FSeq, FAccountID, FExplanation, FDEBIT, FCREDIT,
+               FCurrencyID, FExchangeRate, FLocalDebit, FLocalCredit
     """
-    vouchers = [
-        # 示例凭证 1：银行存款 → 应收账款 结转
+    return Voucher(
+        date=TODAY,
+        voucher_group="记",           # 凭证字（必填）
+        explanation="单条保存测试-银行存款收款",
+        preparer="admin",             # 制单人（必填）
+        entries=[
+            VoucherEntry(
+                account_number="1002",   # 银行存款（必填科目编码）
+                explanation="收回货款",
+                debit=5000.00,
+                credit=0.00,
+                currency="CNY",          # 币别（必填）
+                exchange_rate=1.0,       # 汇率（必填）
+            ),
+            VoucherEntry(
+                account_number="1122",   # 应收账款（必填科目编码）
+                explanation="核销应收账款",
+                debit=0.00,
+                credit=5000.00,
+                currency="CNY",
+                exchange_rate=1.0,
+            ),
+        ],
+    )
+
+
+def build_batch_vouchers() -> list[Voucher]:
+    """
+    构造批量测试凭证列表（使用今天日期）。
+    Build multiple test vouchers using today's date.
+
+    必填字段 / Required fields:
+      Header : FDate, FVoucherGroupID, FDocumentStatus, FPrepareID
+      Entry  : FSeq, FAccountID, FExplanation, FDEBIT, FCREDIT,
+               FCurrencyID, FExchangeRate, FLocalDebit, FLocalCredit
+    """
+    return [
+        # 批量凭证 1：应收账款回款
         Voucher(
-            date=date(2024, 1, 31),
+            date=TODAY,
             voucher_group="记",
-            explanation="1月份应收账款回款",
+            explanation="批量测试-应收账款回款",
             preparer="admin",
             entries=[
                 VoucherEntry(
@@ -44,20 +88,24 @@ def build_sample_vouchers() -> list[Voucher]:
                     explanation="收回货款",
                     debit=10000.00,
                     credit=0.00,
+                    currency="CNY",
+                    exchange_rate=1.0,
                 ),
                 VoucherEntry(
                     account_number="1122",   # 应收账款
                     explanation="核销应收账款",
                     debit=0.00,
                     credit=10000.00,
+                    currency="CNY",
+                    exchange_rate=1.0,
                 ),
             ],
         ),
-        # 示例凭证 2：成本结转
+        # 批量凭证 2：成本结转
         Voucher(
-            date=date(2024, 1, 31),
+            date=TODAY,
             voucher_group="记",
-            explanation="1月份成本结转",
+            explanation="批量测试-成本结转",
             preparer="admin",
             entries=[
                 VoucherEntry(
@@ -65,29 +113,45 @@ def build_sample_vouchers() -> list[Voucher]:
                     explanation="结转销售成本",
                     debit=6000.00,
                     credit=0.00,
+                    currency="CNY",
+                    exchange_rate=1.0,
                 ),
                 VoucherEntry(
                     account_number="1405",   # 库存商品
                     explanation="减少库存",
                     debit=0.00,
                     credit=6000.00,
+                    currency="CNY",
+                    exchange_rate=1.0,
                 ),
             ],
         ),
     ]
-    return vouchers
 
 
-# ── Sync operations ────────────────────────────────────────────────────────────
+# ── Demo operations ────────────────────────────────────────────────────────────
+
+def demo_save(service: VoucherSyncService) -> None:
+    """单条保存凭证示例 — Single save voucher demo."""
+    logger.info("=" * 60)
+    logger.info("单条保存凭证 (Save) Demo  [日期: %s]", TODAY)
+    logger.info("=" * 60)
+
+    voucher = build_single_voucher()
+    logger.info("准备单条保存凭证（日期=%s，凭证字=%s）...", voucher.date, voucher.voucher_group)
+
+    result = service.save_voucher(voucher, validate=True)
+    logger.info("Save 完成，API 响应: %s", result)
+
 
 def demo_batch_save(service: VoucherSyncService) -> None:
     """批量保存凭证示例 — Batch save vouchers demo."""
     logger.info("=" * 60)
-    logger.info("批量保存凭证 (BatchSave) Demo")
+    logger.info("批量保存凭证 (BatchSave) Demo  [日期: %s]", TODAY)
     logger.info("=" * 60)
 
-    vouchers = build_sample_vouchers()
-    logger.info("准备保存 %d 张凭证...", len(vouchers))
+    vouchers = build_batch_vouchers()
+    logger.info("准备批量保存 %d 张凭证...", len(vouchers))
 
     result = service.batch_save_vouchers(vouchers, validate=True)
     logger.info("BatchSave 完成，API 响应: %s", result)
@@ -100,8 +164,8 @@ def demo_query(service: VoucherSyncService) -> None:
     logger.info("=" * 60)
 
     results = service.query_vouchers(
-        date_from=date(2024, 1, 1),
-        date_to=date(2024, 12, 31),
+        date_from=date(TODAY.year, TODAY.month, 1),
+        date_to=TODAY,
         limit=20,
     )
 
@@ -127,6 +191,7 @@ def demo_query(service: VoucherSyncService) -> None:
 def main() -> int:
     try:
         with VoucherSyncService() as service:
+            demo_save(service)
             demo_batch_save(service)
             demo_query(service)
     except KingdeeAPIError as exc:
