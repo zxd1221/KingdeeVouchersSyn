@@ -29,7 +29,8 @@ class VoucherEntry:
     explanation: str
     debit: float = 0.0
     credit: float = 0.0
-    currency: str = "CNY"
+    # 币别编码，默认从 config.CURRENCY_CODE 读取
+    currency: str = field(default_factory=lambda: config.CURRENCY_CODE)
     exchange_rate: float = 1.0
     # 汇率类型编码，默认从 config.EXCHANGE_RATE_TYPE 读取（如 "HLTX01_SYS"）
     exchange_rate_type: str = field(default_factory=lambda: config.EXCHANGE_RATE_TYPE)
@@ -82,7 +83,8 @@ class Voucher:
     """
     date: date
     entries: List[VoucherEntry]
-    voucher_group: str = "记"
+    # 凭证字编码，默认从 config.VOUCHER_GROUP 读取
+    voucher_group: str = field(default_factory=lambda: config.VOUCHER_GROUP)
     voucher_no: int = 0
     explanation: str = ""
     account_book: str = field(default_factory=lambda: config.ACCOUNT_BOOK)

@@ -11,6 +11,7 @@ import logging
 import sys
 from datetime import date
 
+import config
 from kingdee_client import KingdeeClient, KingdeeAPIError
 from models import Voucher, VoucherEntry
 from sync_service import VoucherSyncService
@@ -34,32 +35,29 @@ def build_single_voucher() -> Voucher:
     构造单条测试凭证（使用今天日期）。
     Build a single test voucher using today's date.
 
-    必填字段 / Required fields:
-      Header : FDate, FVoucherGroupID, FDocumentStatus, FPrepareID
-      Entry  : FSeq, FAccountID, FExplanation, FDEBIT, FCREDIT,
-               FCurrencyID, FExchangeRate, FLocalDebit, FLocalCredit
+    凭证字、币别、账簿、汇率类型均从 config / .env 读取，无需在此硬编码。
+    voucher_group / currency / account_book / exchange_rate_type are all
+    driven by config so only the .env file needs updating.
+
+    账号编码必须是金蝶系统中实际存在的科目编码，否则 NumberSearch 会找不到科目。
+    account_number values must exist in your Kingdee chart of accounts.
     """
     return Voucher(
         date=TODAY,
-        voucher_group="记",           # 凭证字（必填）
-        explanation="单条保存测试-银行存款收款",
-        preparer="admin",             # 制单人（必填）
+        # voucher_group / account_book read from config.VOUCHER_GROUP / ACCOUNT_BOOK
         entries=[
             VoucherEntry(
-                account_number="1002",   # 银行存款（必填科目编码）
+                account_number="1002",   # 请替换为系统中实际存在的借方科目编码
                 explanation="收回货款",
                 debit=5000.00,
                 credit=0.00,
-                currency="CNY",          # 币别（必填）
-                exchange_rate=1.0,       # 汇率（必填）
+                # currency / exchange_rate_type read from config
             ),
             VoucherEntry(
-                account_number="1122",   # 应收账款（必填科目编码）
+                account_number="1122",   # 请替换为系统中实际存在的贷方科目编码
                 explanation="核销应收账款",
                 debit=0.00,
                 credit=5000.00,
-                currency="CNY",
-                exchange_rate=1.0,
             ),
         ],
     )
@@ -69,60 +67,42 @@ def build_batch_vouchers() -> list[Voucher]:
     """
     构造批量测试凭证列表（使用今天日期）。
     Build multiple test vouchers using today's date.
-
-    必填字段 / Required fields:
-      Header : FDate, FVoucherGroupID, FDocumentStatus, FPrepareID
-      Entry  : FSeq, FAccountID, FExplanation, FDEBIT, FCREDIT,
-               FCurrencyID, FExchangeRate, FLocalDebit, FLocalCredit
+    凭证字、币别、账簿、汇率类型均从 config / .env 读取。
     """
     return [
         # 批量凭证 1：应收账款回款
         Voucher(
             date=TODAY,
-            voucher_group="记",
-            explanation="批量测试-应收账款回款",
-            preparer="admin",
             entries=[
                 VoucherEntry(
-                    account_number="1002",   # 银行存款
+                    account_number="1002",   # 请替换为系统中实际存在的科目编码
                     explanation="收回货款",
                     debit=10000.00,
                     credit=0.00,
-                    currency="CNY",
-                    exchange_rate=1.0,
                 ),
                 VoucherEntry(
-                    account_number="1122",   # 应收账款
+                    account_number="1122",   # 请替换为系统中实际存在的科目编码
                     explanation="核销应收账款",
                     debit=0.00,
                     credit=10000.00,
-                    currency="CNY",
-                    exchange_rate=1.0,
                 ),
             ],
         ),
         # 批量凭证 2：成本结转
         Voucher(
             date=TODAY,
-            voucher_group="记",
-            explanation="批量测试-成本结转",
-            preparer="admin",
             entries=[
                 VoucherEntry(
-                    account_number="6401",   # 主营业务成本
+                    account_number="6401",   # 请替换为系统中实际存在的科目编码
                     explanation="结转销售成本",
                     debit=6000.00,
                     credit=0.00,
-                    currency="CNY",
-                    exchange_rate=1.0,
                 ),
                 VoucherEntry(
-                    account_number="1405",   # 库存商品
+                    account_number="1405",   # 请替换为系统中实际存在的科目编码
                     explanation="减少库存",
                     debit=0.00,
                     credit=6000.00,
-                    currency="CNY",
-                    exchange_rate=1.0,
                 ),
             ],
         ),
@@ -188,7 +168,29 @@ def demo_query(service: VoucherSyncService) -> None:
 
 # ── Entry point ────────────────────────────────────────────────────────────────
 
+def _check_config() -> None:
+    """在运行前检查必要配置项，给出明确提示。"""
+    missing = []
+    if not config.ACCOUNT_BOOK:
+        missing.append("KINGDEE_ACCOUNT_BOOK  (账簿编码，如 '002')")
+    if not config.EXCHANGE_RATE_TYPE:
+        missing.append("KINGDEE_EXCHANGE_RATE_TYPE  (汇率类型，如 'HLTX01_SYS')")
+    if missing:
+        logger.warning(
+            "以下必填配置项未设置，保存凭证可能失败。请在 .env 文件中添加：\n  %s",
+            "\n  ".join(missing),
+        )
+    logger.info(
+        "当前配置 → 账簿=%r  凭证字=%r  币别=%r  汇率类型=%r",
+        config.ACCOUNT_BOOK,
+        config.VOUCHER_GROUP,
+        config.CURRENCY_CODE,
+        config.EXCHANGE_RATE_TYPE,
+    )
+
+
 def main() -> int:
+    _check_config()
     try:
         with VoucherSyncService() as service:
             demo_save(service)

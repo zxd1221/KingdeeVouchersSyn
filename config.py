@@ -52,3 +52,15 @@ ACCOUNT_BOOK: str = os.getenv("KINGDEE_ACCOUNT_BOOK", "")
 # 查找方式：金蝶系统 → 基础设置 → 汇率管理 → 汇率类型，查看编码列。
 # Must be set to the exchange rate type FNumber used in your Kingdee instance.
 EXCHANGE_RATE_TYPE: str = os.getenv("KINGDEE_EXCHANGE_RATE_TYPE", "")
+
+# ── 默认凭证字 (必填) ─────────────────────────────────────────────────────────
+# 金蝶系统中的凭证字 FNumber（如 "PRE001"，标准系统常见值为 "记"）。
+# 查找方式：金蝶系统 → 总账 → 初始设置 → 凭证字，查看编码列。
+# Set to the voucher group FNumber used in your Kingdee instance.
+VOUCHER_GROUP: str = os.getenv("KINGDEE_VOUCHER_GROUP", "记")
+
+# ── 默认币别 (必填) ───────────────────────────────────────────────────────────
+# 金蝶系统中人民币的 FNumber（标准值 "CNY"，部分系统用其他编码如 "PRE001"）。
+# 查找方式：金蝶系统 → 基础设置 → 币别，查看编码列。
+# Set to the RMB currency FNumber used in your Kingdee instance.
+CURRENCY_CODE: str = os.getenv("KINGDEE_CURRENCY", "CNY")
