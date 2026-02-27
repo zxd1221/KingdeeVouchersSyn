@@ -297,6 +297,7 @@ class KingdeeClient:
         payload = {
             "formid": form_id,
             "data": {
+                "FormId": form_id,
                 "FieldKeys": field_keys,
                 "FilterString": filter_string,
                 "OrderString": order_string,
