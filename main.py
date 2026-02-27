@@ -111,29 +111,98 @@ def build_batch_vouchers() -> list[Voucher]:
 
 # ── Demo operations ────────────────────────────────────────────────────────────
 
+def _build_exact_test_model() -> dict:
+    """
+    直接复现官方 WebAPI 测试中可以成功保存的 Model 数据，原样传给 client.save()。
+    Reproduces the exact Model dict from the known-working WebAPI test payload.
+    系统相关编码（账簿/凭证字/币别/汇率类型）来自 config/.env；
+    科目编码使用官方测试数据中真实存在的编码。
+    """
+    date_str = TODAY.strftime("%Y-%m-%d 00:00:00")
+    cx = config.CURRENCY_CODE          # e.g. "PRE001"
+    rt = config.EXCHANGE_RATE_TYPE     # e.g. "HLTX01_SYS"
+
+    def entry(explanation, account, debit, credit, detail_id=None):
+        row = {
+            "FEXPLANATION": explanation,
+            "FACCOUNTID": {"FNumber": account},
+            "FCURRENCYID": {"FNumber": cx},
+            "FEXCHANGERATETYPE": {"FNumber": rt},
+            "FEXCHANGERATE": 1.0,
+            "FPrice": 0.0,
+            "FQty": 0.0,
+            "FAMOUNTFOR": debit if debit else credit,
+            "FDEBIT": debit,
+            "FCREDIT": credit,
+            "FEXPORTENTRYID": 0,
+        }
+        if detail_id:
+            row["FDetailID"] = detail_id
+        return row
+
+    flex6_113 = {"FDETAILID__FFLEX6": {"FNumber": "113"}}
+    flex6_7_113 = {"FDETAILID__FFLEX6": {"FNumber": "113"}, "FDETAILID__FFLEX7": {"FNumber": "113"}}
+
+    return {
+        "FVOUCHERID": 0,
+        "FAccountBookID": {"FNumber": config.ACCOUNT_BOOK},
+        "FDate": date_str,
+        "FBUSDATE": date_str,
+        "FYEAR": TODAY.year,
+        "FPERIOD": TODAY.month,
+        "FVOUCHERGROUPID": {"FNumber": config.VOUCHER_GROUP},
+        "FVOUCHERGROUPNO": "",        # 空 = 系统自动分配凭证号
+        "FATTACHMENTS": 0,
+        "FISADJUSTVOUCHER": False,
+        "FDocumentStatus": "Z",
+        "FEntity": [
+            entry("361度运动生活京东自营-销售收入",       "1122.01", 41932.50,     0.0,      flex6_113),
+            entry("361度运动生活京东自营-销售收入(瑜伽)", "6001.11", 0.0,      29921.76, flex6_113),
+            entry("361度运动生活京东自营-销售收入(内衣)", "6001.14", 0.0,       7186.65, flex6_113),
+            entry("361度运动生活京东自营-销售收入(税费)", "6001.09", 0.0,       4824.09, flex6_113),
+            entry("361度运动生活京东自营-销售成本(库存商品)", "1405.24", 0.0,  14872.44),
+            entry("361度运动生活京东自营-销售成本(库存商品)", "1405.24", 0.0,   3610.10),
+            entry("361度运动生活京东自营-销售成本(瑜伽)", "6401.11", 14872.44,     0.0,  flex6_7_113),
+            entry("361度运动生活京东自营-销售成本(内衣)", "6401.14",  3610.10,     0.0,  flex6_7_113),
+            entry("361度运动生活京东自营-授权金成本(瑜伽防晒)", "1801.06", 0.0, 1487.24, flex6_7_113),
+            entry("361度运动生活京东自营-授权金成本(内衣保暖)", "1801.10", 0.0,  361.01, flex6_7_113),
+            entry("361度运动生活京东自营-授权金成本",         "6401.09",  1848.25,    0.0,  flex6_7_113),
+        ],
+    }
+
+
 def demo_save(service: VoucherSyncService) -> None:
-    """单条保存凭证示例 — Single save voucher demo."""
+    """
+    单条保存凭证 — 直接使用 WebAPI 可成功保存的精确 Model 数据。
+    Bypasses Voucher/VoucherEntry mapping and calls client.save() with the
+    raw model dict that is known to work in the official WebAPI test tool.
+    """
     logger.info("=" * 60)
     logger.info("单条保存凭证 (Save) Demo  [日期: %s]", TODAY)
     logger.info("=" * 60)
 
-    voucher = build_single_voucher()
-    logger.info("准备单条保存凭证（日期=%s，凭证字=%s）...", voucher.date, voucher.voucher_group)
-
-    result = service.save_voucher(voucher, validate=True)
+    model = _build_exact_test_model()
+    logger.info("准备保存凭证（账簿=%s  凭证字=%s  分录数=%d）...",
+                config.ACCOUNT_BOOK, config.VOUCHER_GROUP, len(model["FEntity"]))
+    result = service.client.save(config.VOUCHER_FORM_ID, model)
     logger.info("Save 完成，API 响应: %s", result)
 
 
 def demo_batch_save(service: VoucherSyncService) -> None:
-    """批量保存凭证示例 — Batch save vouchers demo."""
+    """
+    批量保存凭证 — 使用两份与 WebAPI 精确测试一致的 Model 数据。
+    Uses two copies of the known-working model dict for batch save verification.
+    """
     logger.info("=" * 60)
     logger.info("批量保存凭证 (BatchSave) Demo  [日期: %s]", TODAY)
     logger.info("=" * 60)
 
-    vouchers = build_batch_vouchers()
-    logger.info("准备批量保存 %d 张凭证...", len(vouchers))
-
-    result = service.batch_save_vouchers(vouchers, validate=True)
+    model1 = _build_exact_test_model()
+    model2 = _build_exact_test_model()
+    models = [model1, model2]
+    logger.info("准备批量保存 %d 张凭证（各 %d 条分录）...",
+                len(models), len(model1["FEntity"]))
+    result = service.client.batch_save(config.VOUCHER_FORM_ID, models)
     logger.info("BatchSave 完成，API 响应: %s", result)
 
 
