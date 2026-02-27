@@ -8,7 +8,6 @@ Implements:
   - 单据查询  (ExecuteBillQuery) — query vouchers with filters
 """
 
-import json
 import logging
 from typing import Any, Dict, List, Optional
 
@@ -148,27 +147,29 @@ class KingdeeClient:
             原始 API 响应字典，包含 Result.ResponseStatus
         """
         self._ensure_logged_in()
-        # Per official docs: data must be a JSON string containing options + Model
-        options = {
-            "NeedUpDateFields": [],
-            "NeedReturnFields": [],
-            "IsDeleteEntry": "true",
-            "SubSystemId": "",
-            "IsVerifyBaseDataField": "false",
-            "IsEntryBatchFill": "true",
-            "ValidateFlag": "true",
-            "NumberSearch": "true",
-            "IsAutoAdjustField": "true",
-            "InterationFlags": "",
-            "IgnoreInterationFlag": "",
-            "IsControlPrecision": "false",
-            "ValidateRepeatJson": "false",
-            "Model": data,
-        }
+        # The HTTP API expects data as a JSON object (not a double-encoded string).
+        # The C# SDK docs show a JSON string *parameter*, but the SDK parses it
+        # internally before POSTing, so the actual HTTP body has data as an object.
         payload = {
             "formid": form_id,
-            "data": json.dumps(options, ensure_ascii=False),
+            "data": {
+                "NeedUpDateFields": [],
+                "NeedReturnFields": [],
+                "IsDeleteEntry": "true",
+                "SubSystemId": "",
+                "IsVerifyBaseDataField": "false",
+                "IsEntryBatchFill": "true",
+                "ValidateFlag": "true",
+                "NumberSearch": "true",
+                "IsAutoAdjustField": "true",
+                "InterationFlags": "",
+                "IgnoreInterationFlag": "",
+                "IsControlPrecision": "false",
+                "ValidateRepeatJson": "false",
+                "Model": data,
+            },
         }
+        logger.debug("Save payload: %s", payload)
         result = self._post("save", payload)
         self._check_save_result(result)
         return result
@@ -211,28 +212,28 @@ class KingdeeClient:
             原始 API 响应字典，包含 Result.ResponseStatus
         """
         self._ensure_logged_in()
-        # Per official docs: data must be a JSON string; vouchers go into Model array
-        options = {
-            "NumberSearch": "true",
-            "ValidateFlag": "true",
-            "IsDeleteEntry": "true",
-            "IsEntryBatchFill": "true",
-            "NeedUpDateFields": [],
-            "NeedReturnFields": [],
-            "SubSystemId": "",
-            "InterationFlags": "",
-            "Model": data,
-            "BatchCount": 0,
-            "IsVerifyBaseDataField": "false",
-            "IsAutoAdjustField": "true",
-            "IgnoreInterationFlag": "false",
-            "IsControlPrecision": "false",
-            "ValidateRepeatJson": "false",
-        }
+        # Same as save(): data must be a JSON object, not a double-encoded string.
         payload = {
             "formid": form_id,
-            "data": json.dumps(options, ensure_ascii=False),
+            "data": {
+                "NumberSearch": "true",
+                "ValidateFlag": "true",
+                "IsDeleteEntry": "true",
+                "IsEntryBatchFill": "true",
+                "NeedUpDateFields": [],
+                "NeedReturnFields": [],
+                "SubSystemId": "",
+                "InterationFlags": "",
+                "Model": data,
+                "BatchCount": 0,
+                "IsVerifyBaseDataField": "false",
+                "IsAutoAdjustField": "true",
+                "IgnoreInterationFlag": "false",
+                "IsControlPrecision": "false",
+                "ValidateRepeatJson": "false",
+            },
         }
+        logger.debug("BatchSave payload: %s", payload)
         result = self._post("batch_save", payload)
         self._check_batch_save_result(result)
         return result
@@ -307,7 +308,19 @@ class KingdeeClient:
           第 1..N 行 = 数据行
 
         Parse Kingdee query result (first row = headers, rest = data rows).
+        Raises KingdeeAPIError if the server returned a business error dict
+        instead of the expected 2-D array (e.g. invalid FieldKeys).
         """
+        # Server returns an error object on bad requests — surface it properly.
+        if isinstance(raw, dict):
+            try:
+                resp_status = raw["Result"]["ResponseStatus"]
+                errors = resp_status.get("Errors", [])
+                err_msgs = "; ".join(e.get("Message", str(e)) for e in errors)
+            except (KeyError, TypeError):
+                err_msgs = str(raw)
+            raise KingdeeAPIError(f"Query failed: {err_msgs}")
+
         if not raw or not isinstance(raw, list) or len(raw) < 1:
             return []
 

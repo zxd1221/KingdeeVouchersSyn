@@ -16,15 +16,17 @@ from models import Voucher, VoucherQueryResult
 
 logger = logging.getLogger(__name__)
 
-# Default fields returned by query_vouchers
+# Default fields returned by query_vouchers.
+# NOTE: FExplanation (摘要) lives on FEntity entries, NOT on the GL_VOUCHER header.
+#       Requesting it here would return an empty column or cause a server error.
 DEFAULT_QUERY_FIELDS = (
-    "FVoucherID"
+    "FVOUCHERID"
     ",FDate"
-    ",FVoucherGroupID.FNumber"
-    ",FVoucherGroupNo"
-    ",FExplanation"
+    ",FBillNo"
+    ",FVOUCHERGROUPID.FNumber"
+    ",FVOUCHERGROUPNO"
     ",FDocumentStatus"
-    ",FCreatorID.FName"
+    ",FCreatorId.FName"
     ",FCreateDate"
 )
 

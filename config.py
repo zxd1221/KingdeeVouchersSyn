@@ -40,3 +40,9 @@ ENDPOINTS = {
 
 # ── 凭证表单 ID ───────────────────────────────────────────────────────────────
 VOUCHER_FORM_ID = "GL_VOUCHER"
+
+# ── 账簿编码 (必填) ────────────────────────────────────────────────────────────
+# 必须填写金蝶系统中实际的账簿 FNumber，否则保存凭证时会报"账簿是必填项"。
+# 查找方式：金蝶系统 → 总账 → 初始设置 → 账簿，查看账簿编码列。
+# Must be set to the real account book FNumber in your Kingdee instance.
+ACCOUNT_BOOK: str = os.getenv("KINGDEE_ACCOUNT_BOOK", "")

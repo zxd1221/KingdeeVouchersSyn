@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import List, Optional
 
+import config
+
 
 @dataclass
 class VoucherEntry:
@@ -72,7 +74,7 @@ class Voucher:
     voucher_group: str = "记"
     voucher_no: int = 0
     explanation: str = ""
-    account_book: str = ""
+    account_book: str = field(default_factory=lambda: config.ACCOUNT_BOOK)
     preparer: str = "admin"
 
     def validate(self) -> None:
@@ -96,9 +98,8 @@ class Voucher:
         date_str = self.date.strftime("%Y-%m-%d")
         rows = [e.to_kingdee_row() for e in self.entries]
 
-        return {
+        model: dict = {
             "FVOUCHERID": 0,
-            "FAccountBookID": {"FNumber": self.account_book},
             "FDate": date_str,
             "FBUSDATE": date_str,
             "FVOUCHERGROUPID": {"FNumber": self.voucher_group},
@@ -107,6 +108,12 @@ class Voucher:
             "FDocumentStatus": "A",
             "FEntity": rows,
         }
+        # FAccountBookID is required by the API; include it only when a value is
+        # configured so the server returns a clear "账簿是必填项" error instead of
+        # silently ignoring a blank FNumber search.
+        if self.account_book:
+            model["FAccountBookID"] = {"FNumber": self.account_book}
+        return model
 
 
 @dataclass
@@ -123,11 +130,11 @@ class VoucherQueryResult:
     @classmethod
     def from_row(cls, row: dict) -> "VoucherQueryResult":
         return cls(
-            voucher_id=str(row.get("FVoucherID", "")),
+            voucher_id=str(row.get("FVOUCHERID", "")),
             date=str(row.get("FDate", "")),
-            number=str(row.get("FVoucherGroupNo", "")),
-            voucher_group=str(row.get("FVoucherGroupID", "")),
-            explanation=str(row.get("FExplanation", "")),
+            number=str(row.get("FVOUCHERGROUPNO", "")),
+            voucher_group=str(row.get("FVOUCHERGROUPID.FNumber", "")),
+            explanation="",  # explanation is in FEntity entries, not the header
             document_status=str(row.get("FDocumentStatus", "")),
             raw=row,
         )
