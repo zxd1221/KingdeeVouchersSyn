@@ -8,6 +8,7 @@ Implements:
   - 单据查询  (ExecuteBillQuery) — query vouchers with filters
 """
 
+import json
 import logging
 from typing import Any, Dict, List, Optional
 
@@ -149,7 +150,7 @@ class KingdeeClient:
         self._ensure_logged_in()
         payload = {
             "formid": form_id,
-            "data": data,
+            "data": {"Model": data},
         }
         result = self._post("save", payload)
         self._check_save_result(result)
@@ -195,7 +196,7 @@ class KingdeeClient:
         self._ensure_logged_in()
         payload = {
             "formid": form_id,
-            "data": data,
+            "data": json.dumps(data, ensure_ascii=False),
         }
         result = self._post("batch_save", payload)
         self._check_batch_save_result(result)
