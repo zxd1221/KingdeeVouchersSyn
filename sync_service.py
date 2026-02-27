@@ -133,6 +133,8 @@ class VoucherSyncService:
 
     def query_vouchers(
         self,
+        year: Optional[int] = None,
+        period: Optional[int] = None,
         date_from: Optional[date] = None,
         date_to: Optional[date] = None,
         document_status: Optional[str] = None,
@@ -147,11 +149,16 @@ class VoucherSyncService:
 
         FilterString is sent as an array of filter objects (confirmed working format).
         Each object: {"FieldName":…, "Compare":…, "Value":…, "Left":"", "Right":"", "Logic":"0"}
-        Compare codes: "76"=equals, "4"=>=, "6"=<=
+        Compare codes: "76"=equals (confirmed), "4"=>=, "6"=<=
+
+        优先推荐使用 year/period 过滤（已确认有效）。
+        date_from/date_to 过滤的 Compare 代码未经验证，可能不生效。
 
         Args:
-            date_from:       开始日期（含）
-            date_to:         结束日期（含）
+            year:            会计年度，例如 2026（使用 Compare "76" 精确匹配 FYEAR）
+            period:          会计期间 1-12（使用 Compare "76" 精确匹配 FPERIOD）
+            date_from:       开始日期（含），使用 Compare "4" >= 过滤 FDate
+            date_to:         结束日期（含），使用 Compare "6" <= 过滤 FDate
             document_status: 单据状态过滤，例如 "Z"（暂存）、"C"（已审核）
             voucher_group:   凭证字编码过滤，例如 "PRE001"
             field_keys:      返回字段列表（逗号分隔）
@@ -164,6 +171,20 @@ class VoucherSyncService:
         """
         filters: List[Dict[str, str]] = []
 
+        if year is not None:
+            filters.append({
+                "FieldName": "FYEAR",
+                "Compare": _CMP_EQ,
+                "Value": str(year),
+                "Left": "", "Right": "", "Logic": "0",
+            })
+        if period is not None:
+            filters.append({
+                "FieldName": "FPERIOD",
+                "Compare": _CMP_EQ,
+                "Value": str(period),
+                "Left": "", "Right": "", "Logic": "0",
+            })
         if date_from:
             filters.append({
                 "FieldName": "FDate",

@@ -212,10 +212,10 @@ def demo_query(service: VoucherSyncService) -> None:
     logger.info("单据查询 (ExecuteBillQuery) Demo")
     logger.info("=" * 60)
 
+    # 使用 FYEAR 过滤（与官方 WebAPI 测试一致，Compare "76" 已确认有效）
     results = service.query_vouchers(
-        date_from=date(TODAY.year, TODAY.month, 1),
-        date_to=TODAY,
-        limit=20,
+        year=TODAY.year,
+        limit=10,
     )
 
     if not results:
