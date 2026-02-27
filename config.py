@@ -46,3 +46,9 @@ VOUCHER_FORM_ID = "GL_VOUCHER"
 # 查找方式：金蝶系统 → 总账 → 初始设置 → 账簿，查看账簿编码列。
 # Must be set to the real account book FNumber in your Kingdee instance.
 ACCOUNT_BOOK: str = os.getenv("KINGDEE_ACCOUNT_BOOK", "")
+
+# ── 汇率类型 (必填) ────────────────────────────────────────────────────────────
+# 必须填写金蝶系统中实际使用的汇率类型 FNumber（如 "HLTX01_SYS"）。
+# 查找方式：金蝶系统 → 基础设置 → 汇率管理 → 汇率类型，查看编码列。
+# Must be set to the exchange rate type FNumber used in your Kingdee instance.
+EXCHANGE_RATE_TYPE: str = os.getenv("KINGDEE_EXCHANGE_RATE_TYPE", "")

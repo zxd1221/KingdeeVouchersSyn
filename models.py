@@ -31,6 +31,8 @@ class VoucherEntry:
     credit: float = 0.0
     currency: str = "CNY"
     exchange_rate: float = 1.0
+    # 汇率类型编码，默认从 config.EXCHANGE_RATE_TYPE 读取（如 "HLTX01_SYS"）
+    exchange_rate_type: str = field(default_factory=lambda: config.EXCHANGE_RATE_TYPE)
     local_debit: Optional[float] = None
     local_credit: Optional[float] = None
 
@@ -41,17 +43,26 @@ class VoucherEntry:
             self.local_credit = round(self.credit * self.exchange_rate, 2)
 
     def to_kingdee_row(self) -> dict:
-        """Convert to Kingdee API row format (per official GL_VOUCHER docs)."""
+        """Convert to Kingdee API row format (per official GL_VOUCHER docs).
+
+        Notes:
+          - FEntryID is omitted (not present in working Save examples).
+          - FPrice / FQty are required by the server even for non-quantity accounts.
+          - FEXCHANGERATETYPE must reference a valid FNumber in the system
+            (configure KINGDEE_EXCHANGE_RATE_TYPE in .env, e.g. "HLTX01_SYS").
+        """
         return {
-            "FEntryID": 0,
             "FEXPLANATION": self.explanation,
             "FACCOUNTID": {"FNumber": self.account_number},
             "FCURRENCYID": {"FNumber": self.currency},
-            "FEXCHANGERATETYPE": {"FNumber": ""},
+            "FEXCHANGERATETYPE": {"FNumber": self.exchange_rate_type},
             "FEXCHANGERATE": self.exchange_rate,
+            "FPrice": 0.0,
+            "FQty": 0.0,
             "FAMOUNTFOR": self.debit if self.debit else self.credit,
             "FDEBIT": self.debit,
             "FCREDIT": self.credit,
+            "FEXPORTENTRYID": 0,
         }
 
 
@@ -95,17 +106,23 @@ class Voucher:
         Required header fields: FAccountBookID, FDate, FVOUCHERGROUPID,
         FDocumentStatus, FVOUCHERGROUPNO.
         """
-        date_str = self.date.strftime("%Y-%m-%d")
+        # Date format confirmed from working API test: "YYYY-MM-DD 00:00:00"
+        date_str = self.date.strftime("%Y-%m-%d 00:00:00")
         rows = [e.to_kingdee_row() for e in self.entries]
 
         model: dict = {
             "FVOUCHERID": 0,
             "FDate": date_str,
             "FBUSDATE": date_str,
+            # FYEAR / FPERIOD: required header fields confirmed by working test data
+            "FYEAR": self.date.year,
+            "FPERIOD": self.date.month,
             "FVOUCHERGROUPID": {"FNumber": self.voucher_group},
             "FVOUCHERGROUPNO": str(self.voucher_no) if self.voucher_no else "",
             "FATTACHMENTS": 0,
-            "FDocumentStatus": "A",
+            # "Z" = 暂存 (draft); "A" is the audited state, not valid for new vouchers
+            "FDocumentStatus": "Z",
+            "FISADJUSTVOUCHER": False,
             "FEntity": rows,
         }
         # FAccountBookID is required by the API; include it only when a value is
