@@ -8,6 +8,7 @@ Implements:
   - 单据查询  (ExecuteBillQuery) — query vouchers with filters
 """
 
+import json
 import logging
 from typing import Any, Dict, List, Optional
 
@@ -301,7 +302,11 @@ class KingdeeClient:
             "Limit": limit,
             "SubSystemId": "",
         }
+        # 临时：打印实际发送的 JSON 体，便于与官方 WebAPI 测试器对比
+        logger.info("[DEBUG] Query JSON body:\n%s", json.dumps(payload, ensure_ascii=False, indent=2))
         raw = self._post("query", payload)
+        # 临时：打印服务端原始返回
+        logger.info("[DEBUG] Query raw response: %s", raw)
         return self._parse_query_result(raw)
 
     @staticmethod
