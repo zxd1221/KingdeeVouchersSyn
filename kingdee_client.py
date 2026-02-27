@@ -309,14 +309,20 @@ class KingdeeClient:
         logger.debug("Query payload data string: %s", payload["data"])
         raw = self._post("query", payload)
         logger.info("Query raw response: %s", str(raw)[:500])
-        return self._parse_query_result(raw)
+        return self._parse_query_result(raw, field_keys)
 
     @staticmethod
-    def _parse_query_result(raw: Any) -> List[Dict[str, Any]]:
+    def _parse_query_result(raw: Any, field_keys: str = "") -> List[Dict[str, Any]]:
         """
-        解析查询结果。金蝶返回格式为二维数组：
+        解析查询结果。金蝶返回格式有两种：
+
+        格式 A（含表头行）：
           第 0 行 = 字段名列表（字符串）
           第 1..N 行 = 数据行
+
+        格式 B（无表头行，直接数据）：
+          第 0..N 行 = 数据行（第一个元素为非字符串类型）
+          此时用传入的 field_keys 拆分后作为列名。
 
         错误情况有两种：
           - 顶层 dict：{"Result":{"ResponseStatus":...}}
@@ -353,15 +359,27 @@ class KingdeeClient:
                 if msg is not None:
                     raise KingdeeAPIError(f"Query failed: {msg}")
 
-        # Normal case: first row is a list of field-name strings
-        if not isinstance(first_row, list) or (first_row and not isinstance(first_row[0], str)):
+        if not isinstance(first_row, list):
             return []
 
-        headers: List[str] = first_row
-        rows: List[Dict[str, Any]] = []
-        for row in raw[1:]:
-            rows.append(dict(zip(headers, row)))
-        return rows
+        # Format A: first row contains string field names (header row)
+        if first_row and isinstance(first_row[0], str):
+            headers: List[str] = first_row
+            rows: List[Dict[str, Any]] = []
+            for row in raw[1:]:
+                rows.append(dict(zip(headers, row)))
+            return rows
+
+        # Format B: no header row — API returns data rows directly.
+        # Use field_keys (comma-separated) as column names.
+        if field_keys:
+            headers = [f.strip() for f in field_keys.split(",")]
+            rows = []
+            for row in raw:
+                rows.append(dict(zip(headers, row)))
+            return rows
+
+        return []
 
     # ── Context manager ────────────────────────────────────────────────────────
 
