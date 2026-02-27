@@ -150,13 +150,16 @@ class VoucherSyncService:
         filters: List[str] = []
 
         if date_from:
-            filters.append(f"FDate>='{date_from.strftime('%Y-%m-%d')}'")
+            # Use full datetime in filter: stored value is "YYYY-MM-DD 00:00:00",
+            # so comparing against bare "YYYY-MM-DD" fails as a string (because
+            # "2026-02-27 00:00:00" > "2026-02-27" lexicographically).
+            filters.append(f"FDate>='{date_from.strftime('%Y-%m-%d')} 00:00:00'")
         if date_to:
-            filters.append(f"FDate<='{date_to.strftime('%Y-%m-%d')}'")
+            filters.append(f"FDate<='{date_to.strftime('%Y-%m-%d')} 23:59:59'")
         if document_status:
             filters.append(f"FDocumentStatus='{document_status}'")
         if voucher_group:
-            filters.append(f"FVoucherGroupID.FNumber='{voucher_group}'")
+            filters.append(f"FVOUCHERGROUPID.FNumber='{voucher_group}'")
 
         filter_string = " and ".join(filters)
 
