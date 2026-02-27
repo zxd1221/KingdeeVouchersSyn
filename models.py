@@ -38,19 +38,18 @@ class VoucherEntry:
         if self.local_credit is None:
             self.local_credit = round(self.credit * self.exchange_rate, 2)
 
-    def to_kingdee_row(self, seq: int = 1) -> dict:
-        """Convert to Kingdee API row format."""
+    def to_kingdee_row(self) -> dict:
+        """Convert to Kingdee API row format (per official GL_VOUCHER docs)."""
         return {
             "FEntryID": 0,
-            "FSeq": seq,
-            "FAccountID": {"FNumber": self.account_number},
-            "FExplanation": self.explanation,
+            "FEXPLANATION": self.explanation,
+            "FACCOUNTID": {"FNumber": self.account_number},
+            "FCURRENCYID": {"FNumber": self.currency},
+            "FEXCHANGERATETYPE": {"FNumber": ""},
+            "FEXCHANGERATE": self.exchange_rate,
+            "FAMOUNTFOR": self.debit if self.debit else self.credit,
             "FDEBIT": self.debit,
             "FCREDIT": self.credit,
-            "FCurrencyID": {"FNumber": self.currency},
-            "FExchangeRate": self.exchange_rate,
-            "FLocalDebit": self.local_debit,
-            "FLocalCredit": self.local_credit,
         }
 
 
@@ -88,30 +87,26 @@ class Voucher:
             raise ValueError("Voucher must have at least one entry")
 
     def to_kingdee_data(self) -> dict:
-        """Convert to Kingdee BatchSave data format for GL_VOUCHER."""
-        date_str = self.date.strftime("%Y-%m-%dT00:00:00")
-        rows = [e.to_kingdee_row(seq=i + 1) for i, e in enumerate(self.entries)]
+        """Convert to Kingdee Save/BatchSave Model format for GL_VOUCHER.
 
-        data: dict = {
+        Field names strictly follow the official GL_VOUCHER API documentation.
+        Required header fields: FAccountBookID, FDate, FVOUCHERGROUPID,
+        FDocumentStatus, FVOUCHERGROUPNO.
+        """
+        date_str = self.date.strftime("%Y-%m-%d")
+        rows = [e.to_kingdee_row() for e in self.entries]
+
+        return {
+            "FVOUCHERID": 0,
+            "FAccountBookID": {"FNumber": self.account_book},
             "FDate": date_str,
-            "FVoucherGroupID": {"FNumber": self.voucher_group},
-            "FExplanation": self.explanation,
+            "FBUSDATE": date_str,
+            "FVOUCHERGROUPID": {"FNumber": self.voucher_group},
+            "FVOUCHERGROUPNO": str(self.voucher_no) if self.voucher_no else "",
+            "FATTACHMENTS": 0,
             "FDocumentStatus": "A",
-            "FAttachments": 0,
-            "FPrepareID": {"FUserName": self.preparer},
-            "FEntity": {
-                "FEntityKey": "FEntity",
-                "Row": rows,
-            },
+            "FEntity": rows,
         }
-
-        if self.voucher_no:
-            data["FVoucherGroupNo"] = self.voucher_no
-
-        if self.account_book:
-            data["FAccountBookID"] = {"FNumber": self.account_book}
-
-        return data
 
 
 @dataclass

@@ -148,9 +148,26 @@ class KingdeeClient:
             原始 API 响应字典，包含 Result.ResponseStatus
         """
         self._ensure_logged_in()
+        # Per official docs: data must be a JSON string containing options + Model
+        options = {
+            "NeedUpDateFields": [],
+            "NeedReturnFields": [],
+            "IsDeleteEntry": "true",
+            "SubSystemId": "",
+            "IsVerifyBaseDataField": "false",
+            "IsEntryBatchFill": "true",
+            "ValidateFlag": "true",
+            "NumberSearch": "true",
+            "IsAutoAdjustField": "true",
+            "InterationFlags": "",
+            "IgnoreInterationFlag": "",
+            "IsControlPrecision": "false",
+            "ValidateRepeatJson": "false",
+            "Model": data,
+        }
         payload = {
             "formid": form_id,
-            "data": {"Model": data},
+            "data": json.dumps(options, ensure_ascii=False),
         }
         result = self._post("save", payload)
         self._check_save_result(result)
@@ -194,9 +211,27 @@ class KingdeeClient:
             原始 API 响应字典，包含 Result.ResponseStatus
         """
         self._ensure_logged_in()
+        # Per official docs: data must be a JSON string; vouchers go into Model array
+        options = {
+            "NumberSearch": "true",
+            "ValidateFlag": "true",
+            "IsDeleteEntry": "true",
+            "IsEntryBatchFill": "true",
+            "NeedUpDateFields": [],
+            "NeedReturnFields": [],
+            "SubSystemId": "",
+            "InterationFlags": "",
+            "Model": data,
+            "BatchCount": 0,
+            "IsVerifyBaseDataField": "false",
+            "IsAutoAdjustField": "true",
+            "IgnoreInterationFlag": "false",
+            "IsControlPrecision": "false",
+            "ValidateRepeatJson": "false",
+        }
         payload = {
             "formid": form_id,
-            "data": json.dumps(data, ensure_ascii=False),
+            "data": json.dumps(options, ensure_ascii=False),
         }
         result = self._post("batch_save", payload)
         self._check_batch_save_result(result)
