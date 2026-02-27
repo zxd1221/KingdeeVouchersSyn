@@ -292,48 +292,69 @@ class KingdeeClient:
             记录列表，每条记录为 {字段名: 值} 的字典
         """
         self._ensure_logged_in()
+        # ExecuteBillQuery expects {"formid":..., "data":{query params}}
+        # (same envelope pattern as Save / BatchSave)
         payload = {
-            "FormId": form_id,
-            "FieldKeys": field_keys,
-            "FilterString": filter_string,
-            "OrderString": order_string,
-            "TopRowCount": top_row_count,
-            "StartRow": start_row,
-            "Limit": limit,
-            "SubSystemId": "",
+            "formid": form_id,
+            "data": {
+                "FieldKeys": field_keys,
+                "FilterString": filter_string,
+                "OrderString": order_string,
+                "TopRowCount": top_row_count,
+                "StartRow": start_row,
+                "Limit": limit,
+                "SubSystemId": "",
+            },
         }
-        # 临时：打印实际发送的 JSON 体，便于与官方 WebAPI 测试器对比
-        logger.info("[DEBUG] Query JSON body:\n%s", json.dumps(payload, ensure_ascii=False, indent=2))
+        logger.debug("Query payload: %s", payload)
         raw = self._post("query", payload)
-        # 临时：打印服务端原始返回
-        logger.info("[DEBUG] Query raw response: %s", raw)
         return self._parse_query_result(raw)
 
     @staticmethod
     def _parse_query_result(raw: Any) -> List[Dict[str, Any]]:
         """
         解析查询结果。金蝶返回格式为二维数组：
-          第 0 行 = 字段名列表
+          第 0 行 = 字段名列表（字符串）
           第 1..N 行 = 数据行
 
-        Parse Kingdee query result (first row = headers, rest = data rows).
-        Raises KingdeeAPIError if the server returned a business error dict
-        instead of the expected 2-D array (e.g. invalid FieldKeys).
+        错误情况有两种：
+          - 顶层 dict：{"Result":{"ResponseStatus":...}}
+          - 二维数组但第一行是错误对象：[[{"Result":...}]]
+        两种都会 raise KingdeeAPIError。
         """
-        # Server returns an error object on bad requests — surface it properly.
-        if isinstance(raw, dict):
+        def _extract_error(obj: Any) -> Optional[str]:
+            """Return error message string if obj is a Kingdee error dict, else None."""
+            if not isinstance(obj, dict):
+                return None
             try:
-                resp_status = raw["Result"]["ResponseStatus"]
-                errors = resp_status.get("Errors", [])
-                err_msgs = "; ".join(e.get("Message", str(e)) for e in errors)
+                resp_status = obj["Result"]["ResponseStatus"]
+                if not resp_status.get("IsSuccess", True):
+                    errors = resp_status.get("Errors", [])
+                    return "; ".join(e.get("Message", str(e)) for e in errors) or str(obj)
             except (KeyError, TypeError):
-                err_msgs = str(raw)
-            raise KingdeeAPIError(f"Query failed: {err_msgs}")
+                pass
+            return None
+
+        # Case 1: top-level error dict
+        if isinstance(raw, dict):
+            msg = _extract_error(raw) or str(raw)
+            raise KingdeeAPIError(f"Query failed: {msg}")
 
         if not raw or not isinstance(raw, list) or len(raw) < 1:
             return []
 
-        headers: List[str] = raw[0]
+        # Case 2: error object embedded in first row of 2-D array  [[{Result:...}]]
+        first_row = raw[0]
+        if isinstance(first_row, list) and len(first_row) == 1:
+            msg = _extract_error(first_row[0])
+            if msg is not None:
+                raise KingdeeAPIError(f"Query failed: {msg}")
+
+        # Normal case: first row is a list of field-name strings
+        if not isinstance(first_row, list) or (first_row and not isinstance(first_row[0], str)):
+            return []
+
+        headers: List[str] = first_row
         rows: List[Dict[str, Any]] = []
         for row in raw[1:]:
             rows.append(dict(zip(headers, row)))
