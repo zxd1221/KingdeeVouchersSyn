@@ -308,6 +308,7 @@ class KingdeeClient:
         payload = {"data": json.dumps(query_params, ensure_ascii=False)}
         logger.debug("Query payload data string: %s", payload["data"])
         raw = self._post("query", payload)
+        logger.info("Query raw response: %s", str(raw)[:500])
         return self._parse_query_result(raw)
 
     @staticmethod
@@ -344,11 +345,13 @@ class KingdeeClient:
             return []
 
         # Case 2: error object embedded in first row of 2-D array  [[{Result:...}]]
+        # The error dict may be the only element OR mixed with other elements.
         first_row = raw[0]
-        if isinstance(first_row, list) and len(first_row) == 1:
-            msg = _extract_error(first_row[0])
-            if msg is not None:
-                raise KingdeeAPIError(f"Query failed: {msg}")
+        if isinstance(first_row, list):
+            for item in first_row:
+                msg = _extract_error(item)
+                if msg is not None:
+                    raise KingdeeAPIError(f"Query failed: {msg}")
 
         # Normal case: first row is a list of field-name strings
         if not isinstance(first_row, list) or (first_row and not isinstance(first_row[0], str)):

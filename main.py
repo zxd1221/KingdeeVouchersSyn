@@ -206,23 +206,11 @@ def demo_batch_save(service: VoucherSyncService) -> None:
     logger.info("BatchSave 完成，API 响应: %s", result)
 
 
-def demo_query(service: VoucherSyncService) -> None:
-    """单据查询示例 — Query vouchers demo."""
-    logger.info("=" * 60)
-    logger.info("单据查询 (ExecuteBillQuery) Demo")
-    logger.info("=" * 60)
-
-    # 使用 FYEAR 过滤（与官方 WebAPI 测试一致，Compare "76" 已确认有效）
-    results = service.query_vouchers(
-        year=TODAY.year,
-        limit=10,
-    )
-
+def _print_query_results(results, label: str) -> None:
     if not results:
-        logger.info("未查询到凭证记录")
+        logger.info("[%s] 未查询到凭证记录", label)
         return
-
-    logger.info("查询到 %d 条分录:", len(results))
+    logger.info("[%s] 查询到 %d 条分录:", label, len(results))
     for r in results:
         logger.info(
             "  ID=%-10s  %s年%s期  号=%-6s  科目=%-12s %s  借=%-12.2f  贷=%-12.2f  摘要=%s",
@@ -236,6 +224,40 @@ def demo_query(service: VoucherSyncService) -> None:
             r.credit,
             r.explanation,
         )
+
+
+def demo_query(service: VoucherSyncService) -> None:
+    """单据查询示例 — Query vouchers demo.
+
+    Tests three scenarios to isolate any format vs data issue:
+      1. No filter  — should return the first 10 records across all years
+      2. FYEAR=2024 — exact match to the known-working WebAPI tester JSON
+      3. FYEAR=TODAY.year — query for the current year
+    """
+    logger.info("=" * 60)
+    logger.info("单据查询 (ExecuteBillQuery) Demo")
+    logger.info("=" * 60)
+
+    # ── 场景 1：无过滤条件，取前 10 条（验证 API 连通性与格式）─────────────────
+    logger.info("--- 场景 1：无过滤条件（前 10 条） ---")
+    _print_query_results(
+        service.query_vouchers(limit=10),
+        "无过滤",
+    )
+
+    # ── 场景 2：FYEAR=2024（与官方 WebAPI 测试完全一致）──────────────────────────
+    logger.info("--- 场景 2：FYEAR=2024（与 WebAPI 测试一致） ---")
+    _print_query_results(
+        service.query_vouchers(year=2024, limit=10),
+        "FYEAR=2024",
+    )
+
+    # ── 场景 3：当前年度 ────────────────────────────────────────────────────────
+    logger.info("--- 场景 3：FYEAR=%d（当前年度） ---", TODAY.year)
+    _print_query_results(
+        service.query_vouchers(year=TODAY.year, limit=10),
+        f"FYEAR={TODAY.year}",
+    )
 
 
 # ── Entry point ────────────────────────────────────────────────────────────────
